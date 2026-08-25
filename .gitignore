@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+*.crt
+
+# SSH
+*.pub
+id_rsa*
+id_ed25519*
+
+# Backups / disks / images
+*.iso
+*.img
+*.qcow2
+*.raw
+*.vmdk
+*.vma
+*.tar.zst
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary files
+*.log
+*.tmp
