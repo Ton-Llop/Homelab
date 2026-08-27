@@ -1,8 +1,8 @@
 const POLL_MS = 10_000;
+const HISTORY_MS = 60_000; // el servidor guarda una muestra por minuto
 const TIMEOUT_MS = 8_000;
-const WINDOW_MS = 10 * 60 * 1000; // ventana visible de la grafica
-const MAX_SAMPLES = 240;
-const STORAGE_KEY = "p110:samples";
+const HISTORY_HOURS = 24;
+const HISTORY_POINTS = 180;
 
 const els = {
   body: document.body,
@@ -58,7 +58,6 @@ const fmtCost = decimals(2, 2);
 const fmtClock = new Intl.DateTimeFormat("es-ES", {
   hour: "2-digit",
   minute: "2-digit",
-  second: "2-digit",
 });
 
 // Tres decimales tienen sentido en 0,019 kWh y son falsa precision en 224,500.
@@ -88,35 +87,10 @@ function formatRuntime(minutes) {
   return rest === 0 ? `${days}d` : `${days}d ${rest}h`;
 }
 
-// --- Historico en memoria (sobrevive a recargas del iframe) -----------------
+// --- Historico: lo sirve el backend desde SQLite ----------------------------
 
-function loadSamples() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
-    const cutoff = Date.now() - WINDOW_MS;
-    return raw.filter(([t, w]) => Number.isFinite(t) && Number.isFinite(w) && t > cutoff);
-  } catch {
-    return [];
-  }
-}
-
-function saveSamples() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(samples));
-  } catch {
-    // Modo privado o almacenamiento lleno: la grafica sigue viva en memoria.
-  }
-}
-
-let samples = loadSamples();
+let samples = [];
 let selected = null; // indice bajo el cursor o el foco de teclado
-
-function pushSample(watts) {
-  const cutoff = Date.now() - WINDOW_MS;
-  samples.push([Date.now(), watts]);
-  samples = samples.filter(([t]) => t > cutoff).slice(-MAX_SAMPLES);
-  saveSamples();
-}
 
 // --- Grafica ---------------------------------------------------------------
 
@@ -355,6 +329,11 @@ function renderSummary(data) {
   els.yearKwh.textContent = maybe(data.year_kwh, formatEnergy);
   els.yearCost.textContent = maybe(data.year_cost_eur, formatCost);
   els.yearRuntime.textContent = maybe(data.year_runtime_min, formatRuntime);
+  // El runtime anual lo mide este servicio, no el enchufe: dejamos claro
+  // desde cuando, porque los primeros dias sera mucho menor que el consumo.
+  els.yearRuntime.title = data.measuring_since
+    ? `Medido desde el ${new Date(data.measuring_since).toLocaleDateString("es-ES")}`
+    : "";
 }
 
 function renderWindowStats() {
@@ -367,14 +346,17 @@ function renderWindowStats() {
   const values = samples.map(([, w]) => w);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const spanMin = Math.max(Math.round((Date.now() - samples[0][0]) / 60000), 1);
+  const hours = (Date.now() - samples[0][0]) / 3_600_000;
+  const span = hours >= 1
+    ? `${Math.round(hours)} h`
+    : `${Math.max(Math.round(hours * 60), 1)} min`;
 
-  els.range.textContent = `Potencia · ${spanMin} min`;
+  els.range.textContent = `Potencia · ${span}`;
   els.stats.textContent = `mín ${fmtWhole.format(min)} · máx ${fmtWhole.format(max)} W`;
 
   els.canvas.setAttribute(
     "aria-label",
-    `Potencia de los últimos ${spanMin} minutos: mínimo ${fmtPower.format(min)} vatios, ` +
+    `Potencia de las últimas ${span}: mínimo ${fmtPower.format(min)} vatios, ` +
       `máximo ${fmtPower.format(max)} vatios.`,
   );
 }
@@ -384,40 +366,59 @@ function setState(state, label) {
   els.status.textContent = label;
 }
 
+async function fetchJson(path) {
+  const response = await fetch(path, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
 async function update() {
-  // Sin el iframe a la vista no tiene sentido seguir interrogando al enchufe.
+  // Sin el iframe a la vista no tiene sentido seguir pidiendo datos.
   if (document.hidden) return;
 
   try {
-    const response = await fetch("/power", {
-      cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const data = await response.json();
-
-    renderSummary(data);
-    pushSample(data.power_w);
-    renderWindowStats();
+    renderSummary(await fetchJson("/power"));
     setState("live", "live");
-
-    if (els.body.dataset.view === "table") renderTable();
-    else draw();
   } catch (error) {
     console.warn("No se ha podido leer /power:", error);
     setState("offline", "offline");
   }
 }
 
+async function loadHistory() {
+  if (document.hidden) return;
+
+  try {
+    const data = await fetchJson(`/history?hours=${HISTORY_HOURS}&points=${HISTORY_POINTS}`);
+    // El backend manda segundos epoch; el canvas y el tooltip trabajan en ms.
+    samples = data.points.map(([seconds, watts]) => [seconds * 1000, watts]);
+  } catch (error) {
+    // Un fallo aqui no vacia la grafica: se mantiene el ultimo historico.
+    console.warn("No se ha podido leer /history:", error);
+    return;
+  }
+
+  renderWindowStats();
+
+  if (els.body.dataset.view === "table") renderTable();
+  else draw();
+}
+
 new ResizeObserver(() => draw()).observe(els.frame);
 
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) update();
+  if (document.hidden) return;
+  update();
+  loadHistory();
 });
 
 renderWindowStats();
 draw();
 update();
+loadHistory();
 setInterval(update, POLL_MS);
+setInterval(loadHistory, HISTORY_MS);

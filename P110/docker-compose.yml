@@ -7,5 +7,15 @@ services:
     env_file:
       - ../.env
 
+    environment:
+    
+      POWER_DB_PATH: /data/power.db
+
+    volumes:
+      - power-data:/data
+
     ports:
       - "8765:8765"
+
+volumes:
+  power-data:

@@ -28,3 +28,10 @@ Thumbs.db
 # Temporary files
 *.log
 *.tmp
+
+P110/src/power_monitor/__pycache__/
+P110/src/power_monitor/*.pyc
+P110/uv.lock
+
+.agents/
+.claude/
