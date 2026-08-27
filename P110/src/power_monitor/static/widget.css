@@ -17,8 +17,11 @@
   --accent: #00a884;
   --danger: #ff3b5c;
 
-  --mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", "SF Mono", Consolas, monospace;
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Silkscreen esta dibujada para tamanos pequenos; Press Start 2P entra solo
+     en la cifra grande, donde su rejilla gruesa se lee bien. */
+  --mono: "Silkscreen", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --sans: "Silkscreen", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --display: "Press Start 2P", "Silkscreen", ui-monospace, monospace;
 }
 
 * {
@@ -38,9 +41,8 @@ body {
 }
 
 body {
-  position: relative;
   display: flex;
-  padding: 14px;
+  padding: 10px;
   background:
     radial-gradient(120% 90% at 100% 0%, rgba(0, 168, 132, 0.09), transparent 60%),
     var(--surface);
@@ -63,13 +65,20 @@ body::after {
 }
 
 .widget {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 8px;
   width: 100%;
   height: 100%;
   min-width: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 /* ── Cabecera ─────────────────────────────────────────────────────────── */
@@ -79,21 +88,20 @@ body::after {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-bottom: 9px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--line);
 }
 
 .head__name,
 .head__tools,
-.metric__label,
 .plot__caption,
-.plot__axis,
 .ghost,
+.metrics,
 .tableview {
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 400;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -110,11 +118,11 @@ body::after {
 .head__tools {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .ghost {
-  padding: 3px 7px;
+  padding: 2px 6px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: transparent;
@@ -132,13 +140,13 @@ body::after {
 .status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   color: var(--text-2);
 }
 
 .status__dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--text-3);
 }
@@ -146,46 +154,40 @@ body::after {
 /* ── Cifra principal ──────────────────────────────────────────────────── */
 
 .hero {
-  margin: 0;
-}
-
-.hero__row {
   display: flex;
   align-items: baseline;
-  gap: 7px;
+  gap: 6px;
   margin: 0;
 }
 
 .hero__value {
-  /* Cifras proporcionales a propósito: tabular-nums afloja los dígitos
-     a tamaño display (regla de marks-and-anatomy). */
-  font-size: clamp(2.4rem, 14vw, 3.4rem);
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.025em;
+  font-family: var(--display);
+  font-size: clamp(1.25rem, 7.5vw, 1.7rem);
+  font-weight: 400;
+  line-height: 1.1;
   color: var(--text);
-  text-shadow: 0 0 26px rgba(0, 168, 132, 0.28);
+  text-shadow: 0 0 22px rgba(0, 168, 132, 0.28);
+}
+
+.hero__sprite {
+  margin-left: auto;
+  align-self: center;
+  width: clamp(42px, 16vw, 64px);
+  height: auto;
+  /* Sin esto el navegador interpola y convierte el pixel art en papilla. */
+  image-rendering: pixelated;
 }
 
 .hero__unit {
   font-family: var(--mono);
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   color: var(--text-3);
-}
-
-.hero__meta {
-  margin: 5px 0 0;
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ── Gráfica ──────────────────────────────────────────────────────────── */
 
-/* La grafica es el unico bloque elastico: el iframe de Homarr puede tener
-   cualquier alto y el resto de piezas tienen tamano fijo. */
+/* La gráfica es el único bloque elástico: el iframe de Homarr puede tener
+   cualquier alto y el resto de piezas tienen tamaño fijo. */
 .plot {
   display: flex;
   flex-direction: column;
@@ -194,19 +196,23 @@ body::after {
   margin: 0;
 }
 
-.plot__caption,
-.plot__axis {
+.plot__caption {
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 4px;
   color: var(--text-3);
 }
 
-.plot__caption {
-  margin-bottom: 6px;
+.plot__range {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.plot__peak {
+.plot__stats {
+  flex: none;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
@@ -214,7 +220,7 @@ body::after {
 .plot__frame {
   position: relative;
   flex: 1 1 auto;
-  min-height: 40px;
+  min-height: 34px;
 }
 
 #chart {
@@ -237,15 +243,10 @@ body::after {
   place-items: center;
   margin: 0;
   font-family: var(--mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.16em;
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-3);
-}
-
-.plot__axis {
-  margin-top: 5px;
-  font-variant-numeric: tabular-nums;
 }
 
 .tip {
@@ -255,7 +256,7 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 5px 8px;
+  padding: 4px 7px;
   border: 1px solid var(--line);
   border-radius: 5px;
   background: rgba(14, 20, 28, 0.96);
@@ -265,7 +266,7 @@ body::after {
 
 /* El valor manda, la hora acompaña. */
 .tip__value {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
   color: var(--text);
   font-variant-numeric: tabular-nums;
@@ -273,24 +274,24 @@ body::after {
 
 .tip__time {
   font-family: var(--mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.08em;
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Vista de tabla (el gemelo accesible de la gráfica) ───────────────── */
+/* ── Histórico en tabla: el gemelo accesible de la gráfica ────────────── */
 
 .tableview {
   /* Base 0: la tabla se queda con el hueco sobrante, no lo reclama por su
-     contenido (54 filas empujarian la rejilla de metricas fuera de la tarjeta). */
+     contenido (decenas de filas empujarían las métricas fuera de la tarjeta). */
   flex: 1 1 0;
-  min-height: 60px;
+  min-height: 52px;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
   border: 1px solid var(--line);
   border-radius: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 
 .tableview table {
@@ -301,9 +302,9 @@ body::after {
 
 .tableview th,
 .tableview td {
-  padding: 4px 9px;
+  padding: 3px 8px;
   text-align: left;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .tableview th {
@@ -324,49 +325,58 @@ body::after {
   text-align: right;
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-
-/* ── Rejilla de métricas ──────────────────────────────────────────────── */
+/* ── Métricas: hoy y mes en dos filas ─────────────────────────────────── */
 
 .metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  /* El hueco de 1px sobre el color de línea separa sin dibujar bordes dobles. */
-  gap: 1px;
-  background: var(--line);
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
+  background: var(--panel);
   overflow: hidden;
 }
 
-.metric {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 7px 10px;
-  background: var(--panel);
+.metrics th,
+.metrics td {
+  padding: 3px 6px;
+  text-align: right;
+  font-weight: 400;
+  white-space: nowrap;
 }
 
-.metric--wide {
-  grid-column: 1 / -1;
-}
-
-.metric__label {
+.metrics thead th,
+.metrics thead td {
+  padding-top: 5px;
   color: var(--text-3);
 }
 
-.metric__value {
-  font-size: 0.92rem;
-  font-weight: 500;
-  /* Aquí sí: son columnas de números que deben alinearse. */
+.metrics tbody th {
+  width: 20%;
+  text-align: left;
+  color: var(--text-3);
+}
+
+.metrics tbody td {
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+
+.metrics tbody tr:last-child th,
+.metrics tbody tr:last-child td {
+  padding-bottom: 5px;
+}
+
+.metrics tbody tr + tr th,
+.metrics tbody tr + tr td {
+  border-top: 1px solid var(--line);
+}
+
 
 /* ── Estados ──────────────────────────────────────────────────────────── */
 
@@ -412,11 +422,50 @@ body[data-view="table"] .plot {
   }
 }
 
-/* Tarjeta demasiado baja para una grafica legible: gana la lectura numerica. */
-@media (max-height: 300px) {
-  .plot,
-  .tableview,
-  .hero__meta {
+/* Tarjeta baja: lo primero que sobra es el rótulo de la gráfica, no la gráfica. */
+@media (max-height: 245px) {
+  .plot__caption {
     display: none;
+  }
+
+  .plot__frame {
+    min-height: 26px;
+  }
+
+  .widget {
+    gap: 7px;
+  }
+
+  /* En una tarjeta baja el historico no cabe junto al resumen: lo sustituye
+     mientras esta abierto. */
+  body[data-view="table"] .metrics {
+    display: none;
+  }
+}
+
+/* Por debajo de esto la gráfica cede su alto y la tabla aprieta interlineado,
+   en vez de que la última fila quede cortada por el borde de la tarjeta. */
+@media (max-height: 205px) {
+  .plot__frame {
+    min-height: 0;
+  }
+
+  .widget {
+    gap: 6px;
+  }
+
+  .metrics th,
+  .metrics td {
+    padding: 2px 6px;
+  }
+
+  .metrics thead th,
+  .metrics thead td {
+    padding-top: 3px;
+  }
+
+  .metrics tbody tr:last-child th,
+  .metrics tbody tr:last-child td {
+    padding-bottom: 3px;
   }
 }

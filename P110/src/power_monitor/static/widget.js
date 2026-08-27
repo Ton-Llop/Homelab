@@ -8,14 +8,20 @@ const els = {
   body: document.body,
   status: document.getElementById("status-text"),
   power: document.getElementById("power"),
-  heroMeta: document.getElementById("hero-meta"),
-  peak: document.getElementById("peak"),
-  axisStart: document.getElementById("axis-start"),
+  range: document.getElementById("range"),
+  stats: document.getElementById("stats"),
   todayKwh: document.getElementById("today-kwh"),
   todayCost: document.getElementById("today-cost"),
+  todayRuntime: document.getElementById("today-runtime"),
   monthKwh: document.getElementById("month-kwh"),
   monthCost: document.getElementById("month-cost"),
-  runtime: document.getElementById("runtime"),
+  yearKwh: document.getElementById("year-kwh"),
+  yearCost: document.getElementById("year-cost"),
+  yearRuntime: document.getElementById("year-runtime"),
+  monthRuntime: document.getElementById("month-runtime"),
+  yearKwh: document.getElementById("year-kwh"),
+  yearCost: document.getElementById("year-cost"),
+  yearRuntime: document.getElementById("year-runtime"),
   canvas: document.getElementById("chart"),
   frame: document.querySelector(".plot__frame"),
   empty: document.getElementById("plot-empty"),
@@ -43,7 +49,9 @@ function decimals(min, max) {
 }
 
 const fmtPower = decimals(1, 1);
-const fmtEnergy = decimals(3, 3);
+const fmtEnergySmall = decimals(3, 3);
+const fmtEnergyMid = decimals(2, 2);
+const fmtEnergyLarge = decimals(0, 0);
 const fmtWhole = decimals(0, 0);
 const fmtCostSmall = decimals(3, 3);
 const fmtCost = decimals(2, 2);
@@ -53,16 +61,31 @@ const fmtClock = new Intl.DateTimeFormat("es-ES", {
   second: "2-digit",
 });
 
-function formatCost(value) {
-  // Con centimos sueltos, 2 decimales se quedarian en "0,00 EUR".
-  return `${(value < 1 ? fmtCostSmall : fmtCost).format(value)} €`;
+// Tres decimales tienen sentido en 0,019 kWh y son falsa precision en 224,500.
+function formatEnergy(value) {
+  if (value < 10) return fmtEnergySmall.format(value);
+  if (value < 100) return fmtEnergyMid.format(value);
+  return fmtEnergyLarge.format(value);
 }
 
+function formatCost(value) {
+  // Con centimos sueltos, 2 decimales se quedarian en "0,00": bajamos a 3.
+  return (value < 1 ? fmtCostSmall : fmtCost).format(value);
+}
+
+// Formato corto: la tipografia pixel es ancha y la celda no da para "7 h 11 min".
 function formatRuntime(minutes) {
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 60) return `${minutes}m`;
+
   const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+  if (hours < 24) {
+    const rest = minutes % 60;
+    return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+  }
+
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  return rest === 0 ? `${days}d` : `${days}d ${rest}h`;
 }
 
 // --- Historico en memoria (sobrevive a recargas del iframe) -----------------
@@ -316,19 +339,28 @@ els.viewToggle.addEventListener("click", () => {
 
 // --- Render y ciclo de sondeo ----------------------------------------------
 
+// Guarda por si el backend aun no envia la proyeccion: mejor un guion que un NaN.
+function maybe(value, format) {
+  return Number.isFinite(value) ? format(value) : "—";
+}
+
 function renderSummary(data) {
   els.power.textContent = fmtPower.format(data.power_w);
-  els.todayKwh.textContent = `${fmtEnergy.format(data.today_kwh)} kWh`;
-  els.monthKwh.textContent = `${fmtEnergy.format(data.month_kwh)} kWh`;
+  els.todayKwh.textContent = formatEnergy(data.today_kwh);
+  els.monthKwh.textContent = formatEnergy(data.month_kwh);
   els.todayCost.textContent = formatCost(data.today_cost_eur);
   els.monthCost.textContent = formatCost(data.month_cost_eur);
-  els.runtime.textContent = formatRuntime(data.today_runtime_min);
+  els.todayRuntime.textContent = formatRuntime(data.today_runtime_min);
+  els.monthRuntime.textContent = formatRuntime(data.month_runtime_min);
+  els.yearKwh.textContent = maybe(data.year_kwh, formatEnergy);
+  els.yearCost.textContent = maybe(data.year_cost_eur, formatCost);
+  els.yearRuntime.textContent = maybe(data.year_runtime_min, formatRuntime);
 }
 
 function renderWindowStats() {
   if (samples.length < 2) {
-    els.heroMeta.textContent = "esperando lecturas";
-    els.peak.textContent = "";
+    els.range.textContent = "Potencia";
+    els.stats.textContent = "esperando lectura";
     return;
   }
 
@@ -337,10 +369,8 @@ function renderWindowStats() {
   const max = Math.max(...values);
   const spanMin = Math.max(Math.round((Date.now() - samples[0][0]) / 60000), 1);
 
-  els.heroMeta.textContent =
-    `mín ${fmtPower.format(min)} · máx ${fmtPower.format(max)} W · ${samples.length} muestras`;
-  els.peak.textContent = `pico ${fmtWhole.format(max)} W`;
-  els.axisStart.textContent = `-${spanMin} min`;
+  els.range.textContent = `Potencia · ${spanMin} min`;
+  els.stats.textContent = `mín ${fmtWhole.format(min)} · máx ${fmtWhole.format(max)} W`;
 
   els.canvas.setAttribute(
     "aria-label",

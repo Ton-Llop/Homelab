@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>P110 · Consumo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Press+Start+2P&display=swap">
   <link rel="stylesheet" href="/static/widget.css">
 </head>
 <body data-state="loading" data-view="chart">
@@ -22,39 +26,33 @@
       </div>
     </header>
 
-    <section class="hero">
-      <p class="hero__row">
-        <span class="hero__value" id="power">--</span>
-        <span class="hero__unit">W</span>
-      </p>
-      <p class="hero__meta" id="hero-meta">esperando lectura</p>
-    </section>
+    <p class="hero">
+      <span class="hero__value" id="power">--</span>
+      <span class="hero__unit">W</span>
+      <img class="hero__sprite" src="/static/thresh.gif" alt="" aria-hidden="true"
+           width="192" height="192">
+    </p>
 
     <figure class="plot">
       <figcaption class="plot__caption">
-        <span>Potencia · últimos 10 min</span>
-        <span class="plot__peak" id="peak"></span>
+        <span class="plot__range" id="range">Potencia</span>
+        <span class="plot__stats" id="stats">esperando lectura</span>
       </figcaption>
 
       <div class="plot__frame">
         <canvas id="chart" tabindex="0" role="img"
-                aria-label="Potencia instantánea de los últimos 10 minutos"></canvas>
+                aria-label="Potencia instantánea de los últimos minutos"></canvas>
         <div class="tip" id="tip" hidden>
           <span class="tip__value" id="tip-value"></span>
           <span class="tip__time" id="tip-time"></span>
         </div>
         <p class="plot__empty" id="plot-empty">recopilando muestras</p>
       </div>
-
-      <div class="plot__axis">
-        <span id="axis-start">-10 min</span>
-        <span>ahora</span>
-      </div>
     </figure>
 
     <div class="tableview" id="tableview" hidden>
       <table>
-        <caption class="sr-only">Lecturas de potencia de los últimos 10 minutos</caption>
+        <caption class="sr-only">Lecturas de potencia recientes</caption>
         <thead>
           <tr><th scope="col">Hora</th><th scope="col">Potencia</th></tr>
         </thead>
@@ -62,28 +60,37 @@
       </table>
     </div>
 
-    <div class="metrics">
-      <div class="metric">
-        <span class="metric__label">Hoy</span>
-        <span class="metric__value" id="today-kwh">--</span>
-      </div>
-      <div class="metric">
-        <span class="metric__label">Coste hoy</span>
-        <span class="metric__value" id="today-cost">--</span>
-      </div>
-      <div class="metric">
-        <span class="metric__label">Mes</span>
-        <span class="metric__value" id="month-kwh">--</span>
-      </div>
-      <div class="metric">
-        <span class="metric__label">Coste mes</span>
-        <span class="metric__value" id="month-cost">--</span>
-      </div>
-      <div class="metric metric--wide">
-        <span class="metric__label">Activo hoy</span>
-        <span class="metric__value" id="runtime">--</span>
-      </div>
-    </div>
+    <table class="metrics">
+      <caption class="sr-only">Consumo, coste y tiempo de actividad</caption>
+      <thead>
+        <tr>
+          <td></td>
+          <th scope="col">kWh</th>
+          <th scope="col">€</th>
+          <th scope="col">Activo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Hoy</th>
+          <td id="today-kwh">--</td>
+          <td id="today-cost">--</td>
+          <td id="today-runtime">--</td>
+        </tr>
+        <tr>
+          <th scope="row">Mes</th>
+          <td id="month-kwh">--</td>
+          <td id="month-cost">--</td>
+          <td id="month-runtime">--</td>
+        </tr>
+        <tr>
+          <th scope="row">Año</th>
+          <td id="year-kwh">--</td>
+          <td id="year-cost">--</td>
+          <td id="year-runtime">--</td>
+        </tr>
+      </tbody>
+    </table>
   </main>
 
   <script src="/static/widget.js"></script>

@@ -22,6 +22,7 @@ async def main() -> None:
     print(f"Consum mes:      {snapshot.month_kwh:.3f} kWh")
     print(f"Cost avui:       {calculate_cost(snapshot.today_kwh, price):.3f} €")
     print(f"Cost mes:        {calculate_cost(snapshot.month_kwh, price):.3f} €")
+    print(f"Cost any:        {calculate_cost(snapshot.month_kwh * 12, price):.3f} €")
 
 
 if __name__ == "__main__":
