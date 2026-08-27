@@ -1,0 +1,11 @@
+services:
+  power-monitor:
+    build: .
+    container_name: homelab-power-monitor
+    restart: unless-stopped
+
+    env_file:
+      - ../.env
+
+    ports:
+      - "8765:8765"
