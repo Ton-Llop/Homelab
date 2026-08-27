@@ -6,19 +6,60 @@
   <title>P110 · Consumo</title>
   <link rel="stylesheet" href="/static/widget.css">
 </head>
-<body data-state="loading">
+<body data-state="loading" data-view="chart">
   <main class="widget">
     <header class="head">
-      <span class="name">Tapo P110</span>
-      <span class="status">
-        <span class="dot" aria-hidden="true"></span>
-        <span id="status-text">···</span>
-      </span>
+      <h1 class="head__name">Tapo&nbsp;P110</h1>
+
+      <div class="head__tools">
+        <button id="view-toggle" class="ghost" type="button" aria-pressed="false">
+          tabla
+        </button>
+        <span class="status">
+          <span class="status__dot" aria-hidden="true"></span>
+          <span id="status-text">···</span>
+        </span>
+      </div>
     </header>
 
-    <div class="power">
-      <span class="power__value" id="power">--</span>
-      <span class="power__unit">W</span>
+    <section class="hero">
+      <p class="hero__row">
+        <span class="hero__value" id="power">--</span>
+        <span class="hero__unit">W</span>
+      </p>
+      <p class="hero__meta" id="hero-meta">esperando lectura</p>
+    </section>
+
+    <figure class="plot">
+      <figcaption class="plot__caption">
+        <span>Potencia · últimos 10 min</span>
+        <span class="plot__peak" id="peak"></span>
+      </figcaption>
+
+      <div class="plot__frame">
+        <canvas id="chart" tabindex="0" role="img"
+                aria-label="Potencia instantánea de los últimos 10 minutos"></canvas>
+        <div class="tip" id="tip" hidden>
+          <span class="tip__value" id="tip-value"></span>
+          <span class="tip__time" id="tip-time"></span>
+        </div>
+        <p class="plot__empty" id="plot-empty">recopilando muestras</p>
+      </div>
+
+      <div class="plot__axis">
+        <span id="axis-start">-10 min</span>
+        <span>ahora</span>
+      </div>
+    </figure>
+
+    <div class="tableview" id="tableview" hidden>
+      <table>
+        <caption class="sr-only">Lecturas de potencia de los últimos 10 minutos</caption>
+        <thead>
+          <tr><th scope="col">Hora</th><th scope="col">Potencia</th></tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
     </div>
 
     <div class="metrics">

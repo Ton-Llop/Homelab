@@ -1,15 +1,38 @@
 const POLL_MS = 10_000;
 const TIMEOUT_MS = 8_000;
+const WINDOW_MS = 10 * 60 * 1000; // ventana visible de la grafica
+const MAX_SAMPLES = 240;
+const STORAGE_KEY = "p110:samples";
 
 const els = {
   body: document.body,
   status: document.getElementById("status-text"),
   power: document.getElementById("power"),
+  heroMeta: document.getElementById("hero-meta"),
+  peak: document.getElementById("peak"),
+  axisStart: document.getElementById("axis-start"),
   todayKwh: document.getElementById("today-kwh"),
   todayCost: document.getElementById("today-cost"),
   monthKwh: document.getElementById("month-kwh"),
   monthCost: document.getElementById("month-cost"),
   runtime: document.getElementById("runtime"),
+  canvas: document.getElementById("chart"),
+  frame: document.querySelector(".plot__frame"),
+  empty: document.getElementById("plot-empty"),
+  tip: document.getElementById("tip"),
+  tipValue: document.getElementById("tip-value"),
+  tipTime: document.getElementById("tip-time"),
+  viewToggle: document.getElementById("view-toggle"),
+  tableView: document.getElementById("tableview"),
+  tableBody: document.getElementById("table-body"),
+};
+
+const css = getComputedStyle(document.documentElement);
+const theme = {
+  surface: css.getPropertyValue("--surface").trim(),
+  line: css.getPropertyValue("--line").trim(),
+  muted: css.getPropertyValue("--text-3").trim(),
+  accent: css.getPropertyValue("--accent").trim(),
 };
 
 function decimals(min, max) {
@@ -19,31 +42,311 @@ function decimals(min, max) {
   });
 }
 
-const power = decimals(1, 1);
-const energy = decimals(3, 3);
-// 3 decimals pq no sigui 0,00
-const smallCost = decimals(3, 3);
-const cost = decimals(2, 2);
+const fmtPower = decimals(1, 1);
+const fmtEnergy = decimals(3, 3);
+const fmtWhole = decimals(0, 0);
+const fmtCostSmall = decimals(3, 3);
+const fmtCost = decimals(2, 2);
+const fmtClock = new Intl.DateTimeFormat("es-ES", {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
 
 function formatCost(value) {
-  const fmt = value < 1 ? smallCost : cost;
-  return `${fmt.format(value)} €`;
+  // Con centimos sueltos, 2 decimales se quedarian en "0,00 EUR".
+  return `${(value < 1 ? fmtCostSmall : fmtCost).format(value)} €`;
 }
 
 function formatRuntime(minutes) {
   if (minutes < 60) return `${minutes} min`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
 
-function render(data) {
-  els.power.textContent = power.format(data.power_w);
-  els.todayKwh.textContent = `${energy.format(data.today_kwh)} kWh`;
-  els.monthKwh.textContent = `${energy.format(data.month_kwh)} kWh`;
+// --- Historico en memoria (sobrevive a recargas del iframe) -----------------
+
+function loadSamples() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+    const cutoff = Date.now() - WINDOW_MS;
+    return raw.filter(([t, w]) => Number.isFinite(t) && Number.isFinite(w) && t > cutoff);
+  } catch {
+    return [];
+  }
+}
+
+function saveSamples() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(samples));
+  } catch {
+    // Modo privado o almacenamiento lleno: la grafica sigue viva en memoria.
+  }
+}
+
+let samples = loadSamples();
+let selected = null; // indice bajo el cursor o el foco de teclado
+
+function pushSample(watts) {
+  const cutoff = Date.now() - WINDOW_MS;
+  samples.push([Date.now(), watts]);
+  samples = samples.filter(([t]) => t > cutoff).slice(-MAX_SAMPLES);
+  saveSamples();
+}
+
+// --- Grafica ---------------------------------------------------------------
+
+const ctx = els.canvas.getContext("2d");
+const PAD = { top: 8, right: 8, bottom: 4, left: 8 };
+
+// Pasos 1/1,25/1,5/2... en vez de potencias de 10: con un pico de 108 W el
+// techo queda en 125 y no en 200, que aplastaba la serie contra el suelo.
+const NICE_STEPS = [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+
+function niceCeil(value) {
+  if (value <= 0) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+  return (NICE_STEPS.find((step) => normalized <= step + 1e-9) ?? 10) * magnitude;
+}
+
+function plotGeometry() {
+  const { width, height } = els.canvas.getBoundingClientRect();
+  const values = samples.map(([, w]) => w);
+  const yMax = niceCeil(Math.max(...values, 1) * 1.15);
+  const x0 = PAD.left;
+  const x1 = width - PAD.right;
+  const y0 = PAD.top;
+  const y1 = height - PAD.bottom;
+
+  return {
+    width,
+    yMax,
+    x0,
+    x1,
+    y0,
+    y1,
+    xOf: (i) => (samples.length < 2 ? x1 : x0 + ((x1 - x0) * i) / (samples.length - 1)),
+    yOf: (w) => y1 - (y1 - y0) * (w / yMax),
+  };
+}
+
+function drawMarker(g, index, radius) {
+  const [, watts] = samples[index];
+  const x = g.xOf(index);
+  const y = g.yOf(watts);
+
+  // Anillo de 2px en el color de superficie para que el punto no se pierda.
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 2, 0, Math.PI * 2);
+  ctx.fillStyle = theme.surface;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = theme.accent;
+  ctx.fill();
+}
+
+function drawCrosshair(g, index) {
+  const x = Math.round(g.xOf(index)) + 0.5;
+  ctx.strokeStyle = theme.muted;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, g.y0);
+  ctx.lineTo(x, g.y1);
+  ctx.stroke();
+  drawMarker(g, index, 4);
+}
+
+function draw() {
+  const dpr = window.devicePixelRatio || 1;
+  const { width, height } = els.canvas.getBoundingClientRect();
+  if (width === 0 || height === 0) return;
+
+  els.canvas.width = Math.round(width * dpr);
+  els.canvas.height = Math.round(height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const enough = samples.length >= 2;
+  els.empty.hidden = enough;
+  if (!enough) return;
+
+  const g = plotGeometry();
+
+  // Rejilla: lineas solidas de 1px, un paso por encima de la superficie.
+  ctx.strokeStyle = theme.line;
+  ctx.lineWidth = 1;
+  for (const fraction of [0, 0.5, 1]) {
+    const y = Math.round(g.yOf(g.yMax * fraction)) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(g.x0, y);
+    ctx.lineTo(g.x1, y);
+    ctx.stroke();
+  }
+
+  const path = new Path2D();
+  samples.forEach(([, w], i) => {
+    const x = g.xOf(i);
+    const y = g.yOf(w);
+    if (i === 0) path.moveTo(x, y);
+    else path.lineTo(x, y);
+  });
+
+  // Relleno de area: la serie al ~10 %, difuminado hasta cero.
+  const fill = new Path2D(path);
+  fill.lineTo(g.xOf(samples.length - 1), g.y1);
+  fill.lineTo(g.xOf(0), g.y1);
+  fill.closePath();
+
+  const gradient = ctx.createLinearGradient(0, g.y0, 0, g.y1);
+  gradient.addColorStop(0, "rgba(0, 168, 132, 0.10)");
+  gradient.addColorStop(1, "rgba(0, 168, 132, 0)");
+  ctx.fillStyle = gradient;
+  ctx.fill(fill);
+
+  // Trazo de 2px con halo: el neon sale del glow, no de subir la luminosidad.
+  ctx.save();
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.shadowColor = "rgba(0, 168, 132, 0.55)";
+  ctx.shadowBlur = 10;
+  ctx.stroke(path);
+  ctx.restore();
+
+  drawMarker(g, samples.length - 1, 4);
+  if (selected !== null && selected !== samples.length - 1) drawCrosshair(g, selected);
+}
+
+// --- Capa de hover y teclado -----------------------------------------------
+
+function nearestIndex(clientX) {
+  const rect = els.canvas.getBoundingClientRect();
+  const g = plotGeometry();
+  const x = clientX - rect.left;
+  let best = 0;
+  let bestDistance = Infinity;
+
+  samples.forEach((_, i) => {
+    const distance = Math.abs(g.xOf(i) - x);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = i;
+    }
+  });
+
+  return best;
+}
+
+function showTip(index) {
+  if (samples.length < 2) return;
+  selected = index;
+
+  const g = plotGeometry();
+  const [time, watts] = samples[index];
+
+  els.tipValue.textContent = `${fmtPower.format(watts)} W`;
+  els.tipTime.textContent = fmtClock.format(new Date(time));
+  els.tip.hidden = false;
+
+  els.tip.style.left = `${Math.min(Math.max(g.xOf(index), 44), g.width - 44)}px`;
+  els.tip.style.top = `${Math.max(g.yOf(watts) - 10, 32)}px`;
+  draw();
+}
+
+function hideTip() {
+  selected = null;
+  els.tip.hidden = true;
+  draw();
+}
+
+els.canvas.addEventListener("pointermove", (event) => showTip(nearestIndex(event.clientX)));
+els.canvas.addEventListener("pointerleave", hideTip);
+els.canvas.addEventListener("blur", hideTip);
+
+els.canvas.addEventListener("focus", () => {
+  if (samples.length >= 2) showTip(samples.length - 1);
+});
+
+els.canvas.addEventListener("keydown", (event) => {
+  if (samples.length < 2) return;
+  const current = selected ?? samples.length - 1;
+
+  if (event.key === "ArrowLeft") showTip(Math.max(current - 1, 0));
+  else if (event.key === "ArrowRight") showTip(Math.min(current + 1, samples.length - 1));
+  else if (event.key === "Escape") hideTip();
+  else return;
+
+  event.preventDefault();
+});
+
+// --- Vista de tabla: el gemelo accesible de la grafica ----------------------
+
+function renderTable() {
+  els.tableBody.replaceChildren();
+
+  for (const [time, watts] of [...samples].reverse()) {
+    const row = document.createElement("tr");
+    const when = document.createElement("td");
+    const value = document.createElement("td");
+
+    when.textContent = fmtClock.format(new Date(time));
+    value.textContent = `${fmtPower.format(watts)} W`;
+
+    row.append(when, value);
+    els.tableBody.append(row);
+  }
+}
+
+els.viewToggle.addEventListener("click", () => {
+  const showTable = els.body.dataset.view !== "table";
+
+  els.body.dataset.view = showTable ? "table" : "chart";
+  els.tableView.hidden = !showTable;
+  els.viewToggle.textContent = showTable ? "gráfica" : "tabla";
+  els.viewToggle.setAttribute("aria-pressed", String(showTable));
+
+  if (showTable) renderTable();
+  else draw();
+});
+
+// --- Render y ciclo de sondeo ----------------------------------------------
+
+function renderSummary(data) {
+  els.power.textContent = fmtPower.format(data.power_w);
+  els.todayKwh.textContent = `${fmtEnergy.format(data.today_kwh)} kWh`;
+  els.monthKwh.textContent = `${fmtEnergy.format(data.month_kwh)} kWh`;
   els.todayCost.textContent = formatCost(data.today_cost_eur);
   els.monthCost.textContent = formatCost(data.month_cost_eur);
   els.runtime.textContent = formatRuntime(data.today_runtime_min);
+}
+
+function renderWindowStats() {
+  if (samples.length < 2) {
+    els.heroMeta.textContent = "esperando lecturas";
+    els.peak.textContent = "";
+    return;
+  }
+
+  const values = samples.map(([, w]) => w);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spanMin = Math.max(Math.round((Date.now() - samples[0][0]) / 60000), 1);
+
+  els.heroMeta.textContent =
+    `mín ${fmtPower.format(min)} · máx ${fmtPower.format(max)} W · ${samples.length} muestras`;
+  els.peak.textContent = `pico ${fmtWhole.format(max)} W`;
+  els.axisStart.textContent = `-${spanMin} min`;
+
+  els.canvas.setAttribute(
+    "aria-label",
+    `Potencia de los últimos ${spanMin} minutos: mínimo ${fmtPower.format(min)} vatios, ` +
+      `máximo ${fmtPower.format(max)} vatios.`,
+  );
 }
 
 function setState(state, label) {
@@ -52,7 +355,7 @@ function setState(state, label) {
 }
 
 async function update() {
-
+  // Sin el iframe a la vista no tiene sentido seguir interrogando al enchufe.
   if (document.hidden) return;
 
   try {
@@ -63,17 +366,28 @@ async function update() {
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    render(await response.json());
-    setState("live", "Live");
+    const data = await response.json();
+
+    renderSummary(data);
+    pushSample(data.power_w);
+    renderWindowStats();
+    setState("live", "live");
+
+    if (els.body.dataset.view === "table") renderTable();
+    else draw();
   } catch (error) {
     console.warn("No se ha podido leer /power:", error);
-    setState("offline", "Offline");
+    setState("offline", "offline");
   }
 }
+
+new ResizeObserver(() => draw()).observe(els.frame);
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) update();
 });
 
+renderWindowStats();
+draw();
 update();
 setInterval(update, POLL_MS);

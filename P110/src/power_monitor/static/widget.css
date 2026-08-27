@@ -1,16 +1,34 @@
+/*
+ * Paleta validada con scripts/validate_palette.js (dataviz) en modo dark
+ * sobre la superficie #0a0e14: banda de luminosidad, chroma, separación CVD
+ * y contraste, todo en PASS para el par #00a884 / #ff3b5c.
+ */
 :root {
   color-scheme: dark;
-  --bg: #0f1218;
-  --panel: #161b24;
-  --line: #232a36;
-  --text: #e8ecf3;
-  --muted: #7c8698;
-  --live: #4ade80;
-  --offline: #f87171;
+
+  --surface: #0a0e14;
+  --panel: #0e141c;
+  --line: #1b2431;
+
+  --text: #e6edf3;
+  --text-2: #93a1b5;
+  --text-3: #7b8ba3;
+
+  --accent: #00a884;
+  --danger: #ff3b5c;
+
+  --mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* El [hidden] del UA lo tumba cualquier regla de clase con display:
+   este reset devuelve el control al atributo. */
+[hidden] {
+  display: none !important;
 }
 
 html,
@@ -20,78 +38,310 @@ body {
 }
 
 body {
+  position: relative;
   display: flex;
   padding: 14px;
-  background: var(--bg);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(0, 168, 132, 0.09), transparent 60%),
+    var(--surface);
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* Los dígitos de ancho fijo evitan que el layout "salte" al refrescar cada 10 s. */
-  font-variant-numeric: tabular-nums;
+  font-family: var(--sans);
   overflow: hidden;
 }
 
+/* Rejilla de scanlines: textura de chrome, muy por debajo del peso de los datos. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.018) 0 1px,
+    transparent 1px 3px
+  );
+}
+
 .widget {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 11px;
   width: 100%;
+  height: 100%;
+  min-width: 0;
 }
+
+/* ── Cabecera ─────────────────────────────────────────────────────────── */
 
 .head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
 }
 
-.name,
-.status {
-  font-size: 0.66rem;
-  letter-spacing: 0.14em;
+.head__name,
+.head__tools,
+.metric__label,
+.plot__caption,
+.plot__axis,
+.ghost,
+.tableview {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--muted);
+}
+
+.head__name {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.head__name::before {
+  content: "▚ ";
+  color: var(--accent);
+}
+
+.head__tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ghost {
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ghost:hover,
+.ghost:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  color: var(--text-2);
 }
 
-.dot {
+.status__dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--muted);
-  transition: background 0.3s ease;
+  background: var(--text-3);
 }
 
-.power {
+/* ── Cifra principal ──────────────────────────────────────────────────── */
+
+.hero {
+  margin: 0;
+}
+
+.hero__row {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 7px;
+  margin: 0;
 }
 
-.power__value {
-  font-size: clamp(2rem, 13vw, 3.2rem);
+.hero__value {
+  /* Cifras proporcionales a propósito: tabular-nums afloja los dígitos
+     a tamaño display (regla de marks-and-anatomy). */
+  font-size: clamp(2.4rem, 14vw, 3.4rem);
   font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  text-shadow: 0 0 26px rgba(0, 168, 132, 0.28);
 }
 
-.power__unit {
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--muted);
+.hero__unit {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text-3);
 }
+
+.hero__meta {
+  margin: 5px 0 0;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Gráfica ──────────────────────────────────────────────────────────── */
+
+/* La grafica es el unico bloque elastico: el iframe de Homarr puede tener
+   cualquier alto y el resto de piezas tienen tamano fijo. */
+.plot {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+}
+
+.plot__caption,
+.plot__axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-3);
+}
+
+.plot__caption {
+  margin-bottom: 6px;
+}
+
+.plot__peak {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.plot__frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 40px;
+}
+
+#chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  outline: none;
+}
+
+#chart:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.plot__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.plot__axis {
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tip {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(14, 20, 28, 0.96);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* El valor manda, la hora acompaña. */
+.tip__value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tip__time {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Vista de tabla (el gemelo accesible de la gráfica) ───────────────── */
+
+.tableview {
+  /* Base 0: la tabla se queda con el hueco sobrante, no lo reclama por su
+     contenido (54 filas empujarian la rejilla de metricas fuera de la tarjeta). */
+  flex: 1 1 0;
+  min-height: 60px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.tableview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableview th,
+.tableview td {
+  padding: 4px 9px;
+  text-align: left;
+  letter-spacing: 0.08em;
+}
+
+.tableview th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.tableview td {
+  color: var(--text-2);
+  border-top: 1px solid var(--line);
+}
+
+.tableview td:last-child {
+  color: var(--text);
+  text-align: right;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* ── Rejilla de métricas ──────────────────────────────────────────────── */
 
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* El hueco de 1px sobre el color de línea separa sin dibujar bordes dobles. */
   gap: 1px;
-  /* El gap de 1px sobre fondo --line dibuja las separaciones sin bordes dobles. */
   background: var(--line);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -99,7 +349,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   background: var(--panel);
 }
 
@@ -108,44 +358,65 @@ body {
 }
 
 .metric__label {
-  font-size: 0.58rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-3);
 }
 
 .metric__value {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 500;
+  /* Aquí sí: son columnas de números que deben alinearse. */
+  font-variant-numeric: tabular-nums;
 }
 
-body[data-state="live"] .dot {
-  background: var(--live);
-  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.14);
+/* ── Estados ──────────────────────────────────────────────────────────── */
+
+body[data-state="live"] .status__dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 168, 132, 0.16);
   animation: pulse 2.4s ease-in-out infinite;
 }
 
-body[data-state="offline"] .dot {
-  background: var(--offline);
+body[data-state="live"] .status {
+  color: var(--accent);
 }
 
-body[data-state="offline"] .power,
-body[data-state="offline"] .metrics {
-  opacity: 0.4;
+body[data-state="offline"] .status__dot {
+  background: var(--danger);
 }
 
-body[data-state="offline"] #status-text {
-  color: var(--offline);
+body[data-state="offline"] .status {
+  color: var(--danger);
+}
+
+/* Un refresco fallido no vacía el widget: mantiene el último render atenuado. */
+body[data-state="offline"] .hero,
+body[data-state="offline"] .plot,
+body[data-state="offline"] .metrics,
+body[data-state="offline"] .tableview {
+  opacity: 0.42;
+}
+
+body[data-view="table"] .plot {
+  display: none;
 }
 
 @keyframes pulse {
   50% {
-    opacity: 0.45;
+    opacity: 0.4;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body[data-state="live"] .dot {
+  body[data-state="live"] .status__dot {
     animation: none;
+  }
+}
+
+/* Tarjeta demasiado baja para una grafica legible: gana la lectura numerica. */
+@media (max-height: 300px) {
+  .plot,
+  .tableview,
+  .hero__meta {
+    display: none;
   }
 }
