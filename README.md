@@ -20,36 +20,7 @@ La RAM no hi era quan vaig recuperar el PC, així que el primer problema del hom
 
 ![16 GB detectats](docs/images/03-16gb-detectats.jpg)
 
-## Què vull muntar
 
-Per ara la idea és anar a poc a poc:
-
-- [ ] Pi-hole
-- [ ] Una VM amb Ubuntu Server
-- [ ] Docker / Docker Compose
-- [ ] Jellyfin
-- [ ] Uptime Kuma
-- [ ] Monitoring amb Prometheus / Grafana
-- [ ] Ansible per automatitzar configuracions
-- [ ] Més endavant provar k3s / Kubernetes
-
-No tinc intenció de muntar-ho tot de cop. Prefereixo entendre cada cosa abans d'afegir la següent.
-
-## Estructura del repo
-
-```text
-homelab/
-├── README.md
-├── docs/
-│   ├── hardware.md
-│   ├── network.md
-│   ├── troubleshooting.md
-│   └── images/
-├── proxmox/
-├── docker/
-├── ansible/
-└── scripts/
-```
 
 ## Objectiu
 
