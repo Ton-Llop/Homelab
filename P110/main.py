@@ -1,25 +1,21 @@
 import asyncio
-import os
 
-from dotenv import load_dotenv
-
+from power_monitor.config import load_settings
 from power_monitor.pricing import calculate_cost
 from power_monitor.tapo import TapoPowerReader
 
 
-load_dotenv()
-
-
 async def main() -> None:
+    settings = load_settings()
+
     reader = TapoPowerReader(
-        username=os.environ["TAPO_USERNAME"],
-        password=os.environ["TAPO_PASSWORD"],
-        ip=os.environ["TAPO_IP"],
+        username=settings.tapo_username,
+        password=settings.tapo_password,
+        ip=settings.tapo_ip,
     )
 
     snapshot = await reader.read()
-
-    price = float(os.environ["ELECTRICITY_PRICE_EUR_KWH"])
+    price = settings.price_eur_kwh
 
     print(f"Potència actual: {snapshot.power_w:.2f} W")
     print(f"Consum avui:     {snapshot.today_kwh:.3f} kWh")

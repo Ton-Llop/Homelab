@@ -1,0 +1,151 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1218;
+  --panel: #161b24;
+  --line: #232a36;
+  --text: #e8ecf3;
+  --muted: #7c8698;
+  --live: #4ade80;
+  --offline: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  padding: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Los dígitos de ancho fijo evitan que el layout "salte" al refrescar cada 10 s. */
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+
+.widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.name,
+.status {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.3s ease;
+}
+
+.power {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.power__value {
+  font-size: clamp(2rem, 13vw, 3.2rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.power__unit {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  /* El gap de 1px sobre fondo --line dibuja las separaciones sin bordes dobles. */
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: var(--panel);
+}
+
+.metric--wide {
+  grid-column: 1 / -1;
+}
+
+.metric__label {
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.metric__value {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+body[data-state="live"] .dot {
+  background: var(--live);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.14);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+body[data-state="offline"] .dot {
+  background: var(--offline);
+}
+
+body[data-state="offline"] .power,
+body[data-state="offline"] .metrics {
+  opacity: 0.4;
+}
+
+body[data-state="offline"] #status-text {
+  color: var(--offline);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-state="live"] .dot {
+    animation: none;
+  }
+}

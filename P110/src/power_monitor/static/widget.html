@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P110 · Consumo</title>
+  <link rel="stylesheet" href="/static/widget.css">
+</head>
+<body data-state="loading">
+  <main class="widget">
+    <header class="head">
+      <span class="name">Tapo P110</span>
+      <span class="status">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="status-text">···</span>
+      </span>
+    </header>
+
+    <div class="power">
+      <span class="power__value" id="power">--</span>
+      <span class="power__unit">W</span>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <span class="metric__label">Hoy</span>
+        <span class="metric__value" id="today-kwh">--</span>
+      </div>
+      <div class="metric">
+        <span class="metric__label">Coste hoy</span>
+        <span class="metric__value" id="today-cost">--</span>
+      </div>
+      <div class="metric">
+        <span class="metric__label">Mes</span>
+        <span class="metric__value" id="month-kwh">--</span>
+      </div>
+      <div class="metric">
+        <span class="metric__label">Coste mes</span>
+        <span class="metric__value" id="month-cost">--</span>
+      </div>
+      <div class="metric metric--wide">
+        <span class="metric__label">Activo hoy</span>
+        <span class="metric__value" id="runtime">--</span>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/widget.js"></script>
+</body>
+</html>
