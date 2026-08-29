@@ -93,6 +93,8 @@ Gateway:
 
 I actualitzar també `/etc/hosts` perquè `pve.home.arpa` apuntés a la nova IP.
 
+Aquesta encara no era la IP definitiva: més endavant la vaig haver de tornar a moure (punt 5).
+
 ---
 
 ## 4. Ping funcionava però la web de Proxmox no carregava
@@ -128,7 +130,46 @@ https://192.168.68.250:8006
 
 ---
 
-## 5. Data/hora de BIOS
+## 5. Proxmox estava dins del rang del DHCP
+
+### Problema
+
+Proxmox estava a `192.168.68.250`, i tot funcionava, però el DHCP del router reparteix IPs entre:
+
+```text
+192.168.68.100 - 192.168.68.250
+```
+
+O sigui que el router li podia acabar donant aquesta mateixa IP a qualsevol mòbil o tele de casa i muntar-se un bon conflicte.
+
+### Solució
+
+Moure Proxmox fora del rang:
+
+```text
+192.168.68.251/24
+```
+
+I a partir d'aquí, deixar totes les màquines del homelab de la `.251` cap amunt:
+
+```text
+192.168.68.251 -> Proxmox
+192.168.68.252 -> LXC Homarr
+192.168.68.253 -> LXC Pi-hole
+```
+
+Després del canvi, el certificat del node encara portava la IP antiga i Homarr no es refiava de la connexió HTTPS. Es va arreglar regenerant-lo:
+
+```bash
+pvecm updatecerts --force
+systemctl restart pveproxy
+```
+
+Lliçó apresa: mirar el rang del DHCP **abans** de posar IPs estàtiques, no després.
+
+---
+
+## 6. Data/hora de BIOS
 
 El PC també ha mostrat algun avís dient que no tenia la data i hora configurades.
 

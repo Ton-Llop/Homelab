@@ -20,7 +20,41 @@ La RAM no hi era quan vaig recuperar el PC, així que el primer problema del hom
 
 ![16 GB detectats](docs/images/03-16gb-detectats.jpg)
 
+## Què hi ha muntat ara mateix
 
+| Servei | Què fa | On està |
+|---|---|---|
+| **Proxmox VE** | Hypervisor, la base de tot | `192.168.68.251:8006` |
+| **Homarr** | El dashboard des d'on entro a tot | LXC + Docker a `192.168.68.252:7575` — [docs](homarr/README.md) |
+| **Pi-hole** | DNS de casa i bloqueig d'anuncis i trackers | LXC a `192.168.68.253` — [docs](pi-hole/README.md) |
+| **Power Monitor** | Consum del homelab en temps real amb un Tapo P110 | Docker, port `8765` — [docs](P110/README.md) |
+
+Totes les IPs del homelab van de la `.251` cap amunt perquè el DHCP del router arriba fins a la `.250`. El mapa sencer de la xarxa és a [docs/network.md](docs/network.md).
+
+El monitor de consum és l'únic que he programat jo. La resta són serveis que he anat muntant per aprendre.
+
+![Homarr](homarr/images/ig1.png)
+
+## Com està organitzat el repo
+
+```text
+docs/       documentació general (hardware, xarxa, problemes)
+pi-hole/    notes del Pi-hole
+homarr/     compose i notes del dashboard
+P110/       el monitor de consum (codi propi)
+docker/     compose dels serveis que vagi muntant
+ansible/    playbooks (encara buit)
+proxmox/    configuració i notes de Proxmox
+scripts/    scripts petits de manteniment
+```
+
+Les carpetes buides ja estan pensades per anar-les omplint a mesura que automatitzi coses.
+
+## Què ve després
+
+A [TODO.md](TODO.md) hi tinc la llista de coses que vull anar fent i els serveis que vull afegir.
+
+El següent de la llista són les **còpies de seguretat**, que ara mateix no en tinc cap i tot viu en un sol disc 😅. Després toca DNS local + reverse proxy per deixar d'anar recordant IPs i ports.
 
 ## Objectiu
 
