@@ -134,6 +134,13 @@ El PC també ha mostrat algun avís dient que no tenia la data i hora configurad
 
 Probablement la pila CMOS **CR2032** està gastada, cosa bastant normal en un PC tan vell.
 
+
+## 6. Canvi router principal
+
+Com soc bastant bobo no al canviar de l'adaptador al router ZTE no em vaig catar que no estaven dins de la mateixa red ja que el router tenia 192.168.0.1 i no 192.168.68.1, no em vaig catar i vaig estar 1 fent arp request i tota la vaina pq funques. Amb inspiració divina vaig girar el router i vaig veure que era 0 i no 68.
+Però dsp de fer la pesca i canviar totes les ips, vaig veure que podia conectar el cable d ethernet al deco del costat, que torna a estar a la 68, per comoditat ho vaig fer. Actualment estic dins de la 68!
+
+
 Pendent:
 
 - [ ] canviar la pila CR2032
