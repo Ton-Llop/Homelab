@@ -9,11 +9,29 @@ from fastapi.staticfiles import StaticFiles
 
 from database import count_matches, init_db, recent_matches
 from estadistiques import compute_stats, to_iso
-from riot_api import RiotAuthError, champion_icon_url, get_ddragon_version
+from riot_api import (
+    RiotAuthError,
+    champion_icon_url,
+    get_ddragon_version,
+    get_solo_queue_rank,
+)
 from sincronitzador import get_poll_interval, sync_matches
 from web import STATIC_DIR, router as web_router
 
-logger = logging.getLogger(__name__)
+# Uvicorn nomes configura els seus propis loggers, aixi que un
+# logging.getLogger() pelat es queda a nivell WARNING i els syncs correctes
+# no es veurien enlloc. Li posem sortida propia perque `docker logs` ensenyi
+# que el servei esta viu encara que no hi hagi partides noves.
+logger = logging.getLogger("lol-tracker")
+logger.setLevel(logging.INFO)
+
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(
+        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    )
+    logger.addHandler(_handler)
+    logger.propagate = False
 
 DEFAULT_COUNT = 20
 
@@ -26,6 +44,7 @@ class SyncState:
     last_error: str | None = None
     key_valid: bool = True
     new_matches: int = 0
+    rank: dict | None = None
 
     @property
     def status(self) -> str:
@@ -57,7 +76,11 @@ async def sync_loop(state: SyncState) -> None:
             state.last_error = None
             state.key_valid = True
 
-            logger.info("sync fet: %s partides noves", new_matches)
+            logger.info(
+                "sync fet: %s partides noves, proper en %s min",
+                new_matches,
+                get_poll_interval() // 60,
+            )
 
         except RiotAuthError as exc:
             # La key de desenvolupament caduca cada 24 h. Ho marquem a part
@@ -72,6 +95,15 @@ async def sync_loop(state: SyncState) -> None:
             state.last_error = str(exc)
 
             logger.warning("error durant el sync: %s", exc)
+
+        # L'elo va a part: si league-v4 falla, les partides que acabem de
+        # baixar continuen sent bones i el widget nomes es queda sense el
+        # rang, en comptes de marcar tot el sync com a trencat.
+        try:
+            state.rank = await asyncio.to_thread(get_solo_queue_rank)
+
+        except Exception as exc:
+            logger.warning("no he pogut llegir l'elo: %s", exc)
 
         await asyncio.sleep(get_poll_interval())
 
@@ -123,6 +155,8 @@ async def stats(count: int = Query(default=DEFAULT_COUNT, ge=1, le=100)):
 
     payload = compute_stats(matches)
     payload["status"] = app.state.sync.status
+    # El rang el porta el bucle de sync, aixi el widget nomes fa una crida.
+    payload["rank"] = app.state.sync.rank
 
     return payload
 

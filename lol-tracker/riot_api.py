@@ -26,7 +26,13 @@ TAG_LINE = (os.getenv("RIOT_TAG_LINE") or "").strip()
 # de l'entorn, pero llavors tocara actualitzar-lo a ma cada cop.
 ENV_PUUID = (os.getenv("RIOT_PUUID") or "").strip()
 
+# Riot te dues rutes diferents i es facil equivocar-s'hi:
+#   - regional  (europe) -> match-v5, account-v1
+#   - plataforma (euw1)  -> league-v4, summoner-v4
 BASE_URL = "https://europe.api.riotgames.com"
+
+PLATFORM = (os.getenv("RIOT_PLATFORM") or "euw1").strip()
+PLATFORM_URL = f"https://{PLATFORM}.api.riotgames.com"
 
 # Data Dragon es el CDN public de Riot per icones i dades estatiques.
 # No necessita API key.
@@ -46,7 +52,7 @@ class RiotApiError(RuntimeError):
     """Qualsevol altra resposta d'error de Riot, amb el motiu que dona."""
 
 
-def _request(url: str, params: dict | None = None) -> dict:
+def _request(url: str, params: dict | None = None) -> dict | list:
     if not API_KEY:
         raise RiotAuthError("Falta RIOT_API_KEY a l'entorn")
 
@@ -130,6 +136,40 @@ def get_match(match_id: str):
     url = f"{BASE_URL}/lol/match/v5/matches/{match_id}"
 
     return _request(url)
+
+
+def get_ranked_entries() -> list:
+    """
+    Torna una entrada per cua on l'invocador estigui classificat: solo,
+    flex, etc. Va per la ruta de plataforma, no per la regional.
+    """
+    url = f"{PLATFORM_URL}/lol/league/v4/entries/by-puuid/{get_puuid()}"
+
+    return _request(url)
+
+
+def get_solo_queue_rank() -> dict | None:
+    for entry in get_ranked_entries():
+        if entry.get("queueType") != "RANKED_SOLO_5x5":
+            continue
+
+        wins = entry.get("wins") or 0
+        losses = entry.get("losses") or 0
+        total = wins + losses
+
+        return {
+            "tier": entry.get("tier"),
+            "division": entry.get("rank"),
+            "lp": entry.get("leaguePoints"),
+            "wins": wins,
+            "losses": losses,
+            # Aquest winrate es el de tota la temporada, no el de les
+            # ultimes 20 partides que ensenya la xifra gran.
+            "winrate": round(wins / total * 100, 1) if total else None,
+        }
+
+    # Unranked: encara no ha fet les partides de classificacio.
+    return None
 
 
 def extract_player_stats(match: dict) -> dict:

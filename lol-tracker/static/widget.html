@@ -41,6 +41,33 @@
     .hero b { font-size: 40px; line-height: 1; }
     .hero span { color: var(--text-2); font-size: 11px; }
 
+    /* Colores oficiales aproximados de cada tier, para que el rango se
+       reconozca de un vistazo sin cargar emblemas de ningun CDN externo. */
+    [data-tier="IRON"]        { --tier: #6b6b6b; }
+    [data-tier="BRONZE"]      { --tier: #a4703c; }
+    [data-tier="SILVER"]      { --tier: #9aa8b4; }
+    [data-tier="GOLD"]        { --tier: #e0b64a; }
+    [data-tier="PLATINUM"]    { --tier: #4bbfa8; }
+    [data-tier="EMERALD"]     { --tier: #35b06a; }
+    [data-tier="DIAMOND"]     { --tier: #6b8ff0; }
+    [data-tier="MASTER"]      { --tier: #b968e0; }
+    [data-tier="GRANDMASTER"] { --tier: #e05a5a; }
+    [data-tier="CHALLENGER"]  { --tier: #4fc3f7; }
+
+    .rank {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 2px solid var(--tier, var(--line));
+      padding: 7px 9px;
+      margin: 10px 0;
+    }
+    .rank b { color: var(--tier, var(--text-2)); letter-spacing: .06em; }
+    .rank span { color: var(--text-2); font-size: 11px; }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
@@ -82,6 +109,12 @@
     <span id="record"></span>
   </p>
 
+  <div class="rank" id="rank">
+    <b id="rank-tier">--</b>
+    <span id="rank-lp"></span>
+    <span id="rank-record"></span>
+  </div>
+
   <div class="grid">
     <div class="cell"><u>KDA</u><b id="kda">--</b></div>
     <div class="cell"><u>Asist</u><b id="assists">--</b></div>
@@ -104,6 +137,30 @@
     };
 
     const el = (id) => document.getElementById(id);
+
+    function renderRank(rank) {
+      const caja = el("rank");
+
+      if (!rank || !rank.tier) {
+        // Puede ser que de verdad no este clasificado, o que league-v4 haya
+        // fallado. El motivo sale en los logs del contenedor.
+        delete caja.dataset.tier;
+        el("rank-tier").textContent = "SIN RANGO";
+        el("rank-lp").textContent = "";
+        el("rank-record").textContent = "";
+        return;
+      }
+
+      caja.dataset.tier = rank.tier;
+
+      el("rank-tier").textContent =
+        rank.tier + (rank.division ? " " + rank.division : "");
+      el("rank-lp").textContent = rank.lp + " LP";
+      el("rank-record").textContent =
+        rank.winrate === null
+          ? ""
+          : "· " + rank.wins + "V " + rank.losses + "D (" + rank.winrate + "%)";
+    }
 
     function renderGames(matches) {
       if (!matches.length) {
@@ -141,6 +198,8 @@
         el("record").textContent = stats.games
           ? stats.wins + "V " + stats.losses + "D" + (kp === null ? "" : " · KP " + kp + "%")
           : "sin partidas";
+
+        renderRank(stats.rank);
 
         el("kda").textContent = stats.kda === null ? "--" : stats.kda;
         el("assists").textContent = stats.assists_avg === null ? "--" : stats.assists_avg;
