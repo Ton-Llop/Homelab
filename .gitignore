@@ -32,6 +32,6 @@ Thumbs.db
 P110/src/power_monitor/__pycache__/
 P110/src/power_monitor/*.pyc
 P110/uv.lock
-
+lol-tracker/__pycache__
 .agents/
 .claude/
