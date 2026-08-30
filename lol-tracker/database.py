@@ -10,9 +10,30 @@ DB_PATH = Path(
     )
 )
 
+# Columnes afegides despres de la primera versio de la taula. Les bases de
+# dades que ja existeixen les reben per ALTER TABLE a init_db().
+COLUMNES_NOVES = {
+    "vision_score": "INTEGER",
+    "kill_participation": "REAL",
+}
+
 
 def get_connection() -> sqlite3.Connection:
     return sqlite3.connect(DB_PATH)
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    existents = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(matches)")
+    }
+
+    for nom, tipus in COLUMNES_NOVES.items():
+        if nom not in existents:
+            conn.execute(
+                f"ALTER TABLE matches ADD COLUMN {nom} {tipus}"
+            )
+
 
 def init_db() -> None:
     with get_connection() as conn:
@@ -29,10 +50,14 @@ def init_db() -> None:
                 cs INTEGER NOT NULL,
                 duration REAL NOT NULL,
                 queue_id INTEGER,
-                game_version TEXT
+                game_version TEXT,
+                vision_score INTEGER,
+                kill_participation REAL
             )
             """
         )
+
+        migrate(conn)
 
 
 def save_match(stats: dict) -> bool:
@@ -50,9 +75,11 @@ def save_match(stats: dict) -> bool:
                 cs,
                 duration,
                 queue_id,
-                game_version
+                game_version,
+                vision_score,
+                kill_participation
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 stats["match_id"],
@@ -66,10 +93,13 @@ def save_match(stats: dict) -> bool:
                 stats["duration"],
                 stats["queue_id"],
                 stats["game_version"],
+                stats.get("vision_score"),
+                stats.get("kill_participation"),
             ),
         )
 
         return cursor.rowcount > 0
+
 
 def match_exists(match_id: str) -> bool:
     with get_connection() as conn:
@@ -79,3 +109,50 @@ def match_exists(match_id: str) -> bool:
         ).fetchone()
 
     return row is not None
+
+
+def recent_matches(limit: int = 20) -> list[dict]:
+    with get_connection() as conn:
+        conn.row_factory = sqlite3.Row
+
+        rows = conn.execute(
+            """
+            SELECT match_id,
+                   played_at,
+                   champion,
+                   win,
+                   kills,
+                   deaths,
+                   assists,
+                   cs,
+                   duration,
+                   queue_id,
+                   game_version,
+                   vision_score,
+                   kill_participation
+            FROM matches
+            ORDER BY played_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def count_matches() -> int:
+    with get_connection() as conn:
+        row = conn.execute("SELECT COUNT(*) FROM matches").fetchone()
+
+    return row[0]
+
+
+def delete_all_matches() -> int:
+    """
+    Per re-sincronitzar des de zero quan la taula canvia i les partides
+    velles es queden sense les columnes noves.
+    """
+    with get_connection() as conn:
+        cursor = conn.execute("DELETE FROM matches")
+
+    return cursor.rowcount

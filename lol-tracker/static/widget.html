@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LoL · Tracker</title>
+  <style>
+    /* Version de trabajo: comparte paleta con el widget del P110 para que los
+       dos se vean del mismo homelab. El pulido (fuentes pixeladas, iconos
+       grandes, grafica) viene en la siguiente pasada. */
+    :root {
+      color-scheme: dark;
+      --surface: #0a0e14;
+      --panel: #0e141c;
+      --line: #1b2431;
+      --text: #e6edf3;
+      --text-2: #93a1b5;
+      --accent: #00a884;
+      --danger: #ff3b5c;
+      --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 14px;
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .head { display: flex; justify-content: space-between; align-items: baseline; }
+    .head h1 { margin: 0; font-size: 13px; letter-spacing: .08em; }
+
+    .status { font-size: 11px; color: var(--text-2); }
+    .status[data-bad="true"] { color: var(--danger); }
+
+    .hero { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 4px; }
+    .hero b { font-size: 40px; line-height: 1; }
+    .hero span { color: var(--text-2); font-size: 11px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .cell { background: var(--panel); border: 1px solid var(--line); padding: 8px; }
+    .cell u { display: block; color: var(--text-2); font-size: 10px; text-decoration: none; }
+    .cell b { font-size: 16px; }
+
+    .games { display: flex; gap: 6px; }
+    .game {
+      flex: 1;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-top: 2px solid var(--line);
+      padding: 6px;
+      text-align: center;
+    }
+    .game[data-win="true"] { border-top-color: var(--accent); }
+    .game[data-win="false"] { border-top-color: var(--danger); }
+    .game img { width: 32px; height: 32px; display: block; margin: 0 auto 4px; }
+    .game small { color: var(--text-2); font-size: 10px; }
+
+    .win { color: var(--accent); }
+    .loss { color: var(--danger); }
+    .empty { color: var(--text-2); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <h1>LoL TRACKER</h1>
+    <span class="status" id="status">···</span>
+  </div>
+
+  <p class="hero">
+    <b id="winrate">--</b>
+    <span>% WR</span>
+    <span id="record"></span>
+  </p>
+
+  <div class="grid">
+    <div class="cell"><u>KDA</u><b id="kda">--</b></div>
+    <div class="cell"><u>Asist</u><b id="assists">--</b></div>
+    <div class="cell"><u>Visión</u><b id="vision">--</b></div>
+    <div class="cell"><u>Racha</u><b id="streak">--</b></div>
+  </div>
+
+  <div class="games" id="games"></div>
+
+  <script>
+    // El servidor sincroniza con Riot cada 10-60 min segun la hora, asi que
+    // no tiene sentido preguntar mas a menudo que esto.
+    const POLL_MS = 60000;
+
+    const STATUS_LABELS = {
+      ok: "LIVE",
+      starting: "iniciando",
+      degraded: "sync con errores",
+      auth_error: "API KEY CADUCADA",
+    };
+
+    const el = (id) => document.getElementById(id);
+
+    function renderGames(matches) {
+      if (!matches.length) {
+        el("games").innerHTML = '<p class="empty">sin partidas todavia</p>';
+        return;
+      }
+
+      el("games").innerHTML = matches
+        .map((m) => {
+          const icon = m.icon
+            ? '<img src="' + m.icon + '" alt="' + m.champion + '" loading="lazy">'
+            : "";
+
+          return (
+            '<div class="game" data-win="' + m.win + '">' +
+            icon +
+            "<div>" + m.kills + "/" + m.deaths + "/" + m.assists + "</div>" +
+            "<small>" + m.champion + "</small>" +
+            "</div>"
+          );
+        })
+        .join("");
+    }
+
+    async function refresh() {
+      try {
+        const [stats, recent] = await Promise.all([
+          fetch("/stats?count=20").then((r) => r.json()),
+          fetch("/matches?limit=5").then((r) => r.json()),
+        ]);
+
+        el("winrate").textContent = stats.winrate === null ? "--" : stats.winrate;
+
+        const kp = stats.kill_participation_avg;
+        el("record").textContent = stats.games
+          ? stats.wins + "V " + stats.losses + "D" + (kp === null ? "" : " · KP " + kp + "%")
+          : "sin partidas";
+
+        el("kda").textContent = stats.kda === null ? "--" : stats.kda;
+        el("assists").textContent = stats.assists_avg === null ? "--" : stats.assists_avg;
+        el("vision").textContent = stats.vision_avg === null ? "--" : stats.vision_avg;
+
+        const streak = stats.streak;
+        el("streak").textContent = streak.type ? streak.length + streak.type : "--";
+        el("streak").className = streak.type === "W" ? "win" : "loss";
+
+        renderGames(recent.matches);
+
+        el("status").textContent = STATUS_LABELS[stats.status] || stats.status;
+        el("status").dataset.bad = String(stats.status !== "ok");
+      } catch (err) {
+        el("status").textContent = "sin conexion";
+        el("status").dataset.bad = "true";
+      }
+    }
+
+    refresh();
+    setInterval(refresh, POLL_MS);
+  </script>
+</body>
+</html>

@@ -47,6 +47,9 @@ services:
     volumes:
       - lol-data:/data
 
+    ports:
+      - "8766:8766"
+
 volumes:
   power-data:
   lol-data:

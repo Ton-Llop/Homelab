@@ -33,12 +33,14 @@ Totes les IPs del homelab van de la `.251` cap amunt perquè el DHCP del router 
 
 El monitor de consum és l'únic que he programat jo. La resta són serveis que he anat muntant per aprendre.
 
+El homelab gasta uns **35,5 W en repòs**, que amb el meu preu de la llum són uns 63 €/any. A [docs/consum.md](docs/consum.md) hi ha el desglossament, què he provat per baixar-ho i què queda per fer.
+
 ![Homarr](homarr/images/ig1.png)
 
 ## Com està organitzat el repo
 
 ```text
-docs/       documentació general (hardware, xarxa, problemes)
+docs/       documentació general (hardware, xarxa, consum, problemes)
 pi-hole/    notes del Pi-hole
 homarr/     compose i notes del dashboard
 P110/       el monitor de consum (codi propi)

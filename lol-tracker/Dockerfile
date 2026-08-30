@@ -15,4 +15,6 @@ RUN uv sync --frozen --no-dev
 
 COPY lol-tracker/ ./
 
-CMD ["/app/.venv/bin/python", "worker.py"]
+EXPOSE 8766
+
+CMD ["/app/.venv/bin/uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8766"]

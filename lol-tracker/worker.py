@@ -1,44 +1,14 @@
 """
-Es qui mirarà cada X temps si hi ha un nou game o no, estarà en un cont docker
+Es qui mirarà cada X temps si hi ha un nou game o no.
+
+Amb la API web activada aquest bucle viu dins d'api.py, igual que el
+sampler del P110. Aquest fitxer queda per poder llançar el sync a mà
+sense aixecar el servidor.
 """
-import os
 import time
-from datetime import datetime
-from pathlib import Path
 
-from dotenv import load_dotenv
-
-from sincronitzador import sync_matches
 from database import init_db
-
-
-ROOT_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT_DIR / ".env")
-
-
-POLL_DAY_SECONDS = int(
-    os.getenv("LOL_POLL_DAY_SECONDS", "1800")
-)
-
-POLL_EVENING_SECONDS = int(
-    os.getenv("LOL_POLL_EVENING_SECONDS", "600")
-)
-
-POLL_NIGHT_SECONDS = int(
-    os.getenv("LOL_POLL_NIGHT_SECONDS", "3600")
-)
-
-
-def get_poll_interval() -> int:
-    hour = datetime.now().hour
-
-    if 0 <= hour < 8:
-        return POLL_NIGHT_SECONDS
-
-    if 8 <= hour < 16:
-        return POLL_DAY_SECONDS
-
-    return POLL_EVENING_SECONDS
+from sincronitzador import get_poll_interval, sync_matches
 
 
 def main() -> None:
