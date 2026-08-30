@@ -1,6 +1,7 @@
 import os
 import time
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 from dotenv import load_dotenv
@@ -10,12 +11,20 @@ ENV_PATH = ROOT_DIR / ".env"
 
 load_dotenv(ENV_PATH)
 
-API_KEY = os.environ["RIOT_API_KEY"].strip()
-RIOT_PUUID = os.environ["RIOT_PUUID"].strip()
+# Res d'aixo es obligatori a l'importar: si falta configuracio volem que el
+# servidor arrenqui igualment i que ho canti per /health i pel widget, en
+# comptes de petar a l'arrencada i deixar-nos sense res que mirar.
+API_KEY = (os.getenv("RIOT_API_KEY") or "").strip()
 
-HEADERS = {
-    "X-Riot-Token": API_KEY,
-}
+# El Riot ID (Nom#TAG) es estable per sempre. El PUUID no: va xifrat amb la
+# key que el va generar, aixi que quan la key rota deixa de servir i Riot
+# respon "Exception decrypting". Per aixo el resolem en calent.
+GAME_NAME = (os.getenv("RIOT_GAME_NAME") or "").strip()
+TAG_LINE = (os.getenv("RIOT_TAG_LINE") or "").strip()
+
+# Compatibilitat cap enrere: si no hi ha Riot ID encara fem servir el PUUID
+# de l'entorn, pero llavors tocara actualitzar-lo a ma cada cop.
+ENV_PUUID = (os.getenv("RIOT_PUUID") or "").strip()
 
 BASE_URL = "https://europe.api.riotgames.com"
 
@@ -33,10 +42,17 @@ class RiotAuthError(RuntimeError):
     """
 
 
+class RiotApiError(RuntimeError):
+    """Qualsevol altra resposta d'error de Riot, amb el motiu que dona."""
+
+
 def _request(url: str, params: dict | None = None) -> dict:
+    if not API_KEY:
+        raise RiotAuthError("Falta RIOT_API_KEY a l'entorn")
+
     response = requests.get(
         url,
-        headers=HEADERS,
+        headers={"X-Riot-Token": API_KEY},
         params=params,
         timeout=10,
     )
@@ -47,20 +63,67 @@ def _request(url: str, params: dict | None = None) -> dict:
             f"(HTTP {response.status_code})"
         )
 
-    response.raise_for_status()
+    if not response.ok:
+        # Riot explica el motiu al cos de la resposta. Amb un
+        # raise_for_status() pelat nomes veiem "400 Bad Request" i no hi ha
+        # manera de saber que li ha molestat.
+        raise RiotApiError(
+            f"HTTP {response.status_code} de Riot: {response.text[:300]}"
+        )
 
     return response.json()
 
 
+_puuid_cache: dict = {"value": None}
+
+
+def get_puuid_by_riot_id(game_name: str, tag_line: str) -> str:
+    url = (
+        f"{BASE_URL}/riot/account/v1/accounts/by-riot-id/"
+        f"{quote(game_name)}/{quote(tag_line)}"
+    )
+
+    return _request(url)["puuid"]
+
+
+def get_puuid(refresh: bool = False) -> str:
+    if not refresh and _puuid_cache["value"]:
+        return _puuid_cache["value"]
+
+    if GAME_NAME and TAG_LINE:
+        puuid = get_puuid_by_riot_id(GAME_NAME, TAG_LINE)
+
+    elif ENV_PUUID:
+        puuid = ENV_PUUID
+
+    else:
+        raise RiotApiError(
+            "Falta RIOT_GAME_NAME i RIOT_TAG_LINE a l'entorn "
+            "(o be un RIOT_PUUID valid)"
+        )
+
+    _puuid_cache["value"] = puuid
+
+    return puuid
+
+
 def get_match_ids(count: int = 10):
-    url = f"{BASE_URL}/lol/match/v5/matches/by-puuid/{RIOT_PUUID}/ids"
+    def demana(puuid: str):
+        url = f"{BASE_URL}/lol/match/v5/matches/by-puuid/{puuid}/ids"
 
-    params = {
-        "start": 0,
-        "count": count,
-    }
+        return _request(url, params={"start": 0, "count": count})
 
-    return _request(url, params=params)
+    try:
+        return demana(get_puuid())
+
+    except RiotApiError as exc:
+        # "Exception decrypting" vol dir que el PUUID el va generar una key
+        # anterior. Si tenim el Riot ID el tornem a resoldre i reintentem un
+        # sol cop; aixi una rotacio de key es cura sola.
+        if "decrypting" not in str(exc) or not (GAME_NAME and TAG_LINE):
+            raise
+
+        return demana(get_puuid(refresh=True))
 
 
 def get_match(match_id: str):
@@ -71,12 +134,13 @@ def get_match(match_id: str):
 
 def extract_player_stats(match: dict) -> dict:
     participants = match["info"]["participants"]
+    puuid = get_puuid()
 
     player = next(
         (
             participant
             for participant in participants
-            if participant["puuid"] == RIOT_PUUID
+            if participant["puuid"] == puuid
         ),
         None,
     )
