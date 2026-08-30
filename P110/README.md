@@ -98,6 +98,9 @@ El `.env` real **no es puja al repositori**.
 
 ## Docker
 
+El `docker-compose.yml` de tot el homelab és a l'arrel del repo, així que aquestes
+comandes s'executen des d'allà (no des de `P110/`).
+
 Per construir i aixecar el servei:
 
 ```bash

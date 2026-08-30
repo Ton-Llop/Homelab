@@ -1,0 +1,43 @@
+# Git / editors
+.git
+.gitignore
+.vscode/
+.idea/
+.agents/
+.claude/
+
+# Secrets: les variables entren per env_file, mai dins de la imatge
+.env
+.env.*
+*.key
+*.pem
+*.crt
+
+# Entorns virtuals i cache de Python
+.venv
+**/.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Bases de dades locals: en produccio viuen al volum /data
+**/*.db
+**/*.db-wal
+**/*.db-shm
+
+# Documentacio i imatges, no calen a la imatge
+**/docs/
+**/images/
+
+# Serveis que no es construeixen des d'aqui
+ansible/
+proxmox/
+scripts/
+docker/
+homarr/
+pi-hole/
+
+# Els Dockerfile els llegeix BuildKit a part, no calen dins del context
+**/Dockerfile

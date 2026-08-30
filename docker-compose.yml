@@ -1,0 +1,52 @@
+# Stack del homelab que corre sobre Docker.
+#
+#   docker compose up -d --build     aixeca-ho tot
+#   docker compose logs -f           logs de tots els serveis
+#   docker compose up -d lol-tracker  nomes un servei
+#
+# Homarr i Pi-hole no son aqui perque viuen als seus propis LXC
+# (192.168.68.252 i .253), cadascun amb el seu compose.
+
+name: homelab
+
+services:
+  power-monitor:
+    build:
+      context: .
+      dockerfile: P110/Dockerfile
+    image: homelab/power-monitor:latest
+    container_name: homelab-power-monitor
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      POWER_DB_PATH: /data/power.db
+
+    volumes:
+      - power-data:/data
+
+    ports:
+      - "8765:8765"
+
+  lol-tracker:
+    build:
+      context: .
+      dockerfile: lol-tracker/Dockerfile
+    image: homelab/lol-tracker:latest
+    container_name: lol-tracker
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      LOL_DB_PATH: /data/lol.db
+
+    volumes:
+      - lol-data:/data
+
+volumes:
+  power-data:
+  lol-data:
