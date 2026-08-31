@@ -34,6 +34,11 @@ BASE_URL = "https://europe.api.riotgames.com"
 PLATFORM = (os.getenv("RIOT_PLATFORM") or "euw1").strip()
 PLATFORM_URL = f"https://{PLATFORM}.api.riotgames.com"
 
+# A partir de Master ja no hi ha divisions, pero Riot continua enviant
+# rank: "I" a la resposta. Si el pintessim tal qual sortiria "MASTER I", que
+# no es com ho ensenya el client del joc.
+APEX_TIERS = {"MASTER", "GRANDMASTER", "CHALLENGER"}
+
 # Data Dragon es el CDN public de Riot per icones i dades estatiques.
 # No necessita API key.
 DDRAGON_BASE = "https://ddragon.leagueoflegends.com"
@@ -157,9 +162,11 @@ def get_solo_queue_rank() -> dict | None:
         losses = entry.get("losses") or 0
         total = wins + losses
 
+        tier = entry.get("tier")
+
         return {
-            "tier": entry.get("tier"),
-            "division": entry.get("rank"),
+            "tier": tier,
+            "division": None if tier in APEX_TIERS else entry.get("rank"),
             "lp": entry.get("leaguePoints"),
             "wins": wins,
             "losses": losses,

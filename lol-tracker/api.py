@@ -7,7 +7,15 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
 
-from database import count_matches, init_db, recent_matches
+from database import (
+    DEFAULT_QUEUE_ID,
+    count_matches,
+    init_db,
+    rank_history,
+    recent_matches,
+    save_rank,
+    top_champions,
+)
 from estadistiques import compute_stats, to_iso
 from riot_api import (
     RiotAuthError,
@@ -102,6 +110,11 @@ async def sync_loop(state: SyncState) -> None:
         try:
             state.rank = await asyncio.to_thread(get_solo_queue_rank)
 
+            # Riot no guarda historic de LP, aixi que el que no anotem aqui
+            # es perd. save_rank nomes escriu si el LP s'ha mogut.
+            if await asyncio.to_thread(save_rank, state.rank):
+                logger.info("elo nou: %s LP", state.rank["lp"])
+
         except Exception as exc:
             logger.warning("no he pogut llegir l'elo: %s", exc)
 
@@ -146,6 +159,12 @@ async def health():
         ),
         "last_error": state.last_error,
         "total_matches": await asyncio.to_thread(count_matches),
+        # El widget nomes ensenya una cua: si el total i el de la cua no
+        # s'assemblen, es que la majoria de partides son d'ARAM o de flex.
+        "queue_id": DEFAULT_QUEUE_ID,
+        "queue_matches": await asyncio.to_thread(
+            count_matches, DEFAULT_QUEUE_ID
+        ),
     }
 
 
@@ -181,6 +200,31 @@ async def matches(limit: int = Query(default=5, ge=1, le=50)):
                 "cs": row["cs"],
                 "duration": row["duration"],
                 "queue_id": row["queue_id"],
+            }
+            for row in rows
+        ],
+    }
+
+
+@app.get("/rank-history")
+async def historic_elo(limit: int = Query(default=60, ge=2, le=500)):
+    """Mostres de LP per dibuixar la linia, de mes vella a mes nova."""
+    points = await asyncio.to_thread(rank_history, limit)
+
+    return {"points": points}
+
+
+@app.get("/champions")
+async def champions(limit: int = Query(default=3, ge=1, le=20)):
+    rows = await asyncio.to_thread(top_champions, limit)
+    version = await asyncio.to_thread(get_ddragon_version)
+
+    return {
+        "ddragon_version": version,
+        "champions": [
+            {
+                **row,
+                "icon": champion_icon_url(row["champion"], version),
             }
             for row in rows
         ],

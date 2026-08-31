@@ -28,10 +28,11 @@ La RAM no hi era quan vaig recuperar el PC, així que el primer problema del hom
 | **Homarr** | El dashboard des d'on entro a tot | LXC + Docker a `192.168.68.252:7575` — [docs](homarr/README.md) |
 | **Pi-hole** | DNS de casa i bloqueig d'anuncis i trackers | LXC a `192.168.68.253` — [docs](pi-hole/README.md) |
 | **Power Monitor** | Consum del homelab en temps real amb un Tapo P110 | Docker, port `8765` — [docs](P110/README.md) |
+| **LoL Tracker** | Les meves partides de League en un widget del dashboard | Docker, port `8766` — [docs](lol-tracker/README.md) |
 
 Totes les IPs del homelab van de la `.251` cap amunt perquè el DHCP del router arriba fins a la `.250`. El mapa sencer de la xarxa és a [docs/network.md](docs/network.md).
 
-El monitor de consum és l'únic que he programat jo. La resta són serveis que he anat muntant per aprendre.
+El monitor de consum i el tracker de League són els únics que he programat jo. La resta són serveis que he anat muntant per aprendre.
 
 El homelab gasta uns **35,5 W en repòs**, que amb el meu preu de la llum són uns 63 €/any. A [docs/consum.md](docs/consum.md) hi ha el desglossament, què he provat per baixar-ho i què queda per fer.
 
@@ -40,14 +41,15 @@ El homelab gasta uns **35,5 W en repòs**, que amb el meu preu de la llum són u
 ## Com està organitzat el repo
 
 ```text
-docs/       documentació general (hardware, xarxa, consum, problemes)
-pi-hole/    notes del Pi-hole
-homarr/     compose i notes del dashboard
-P110/       el monitor de consum (codi propi)
-docker/     compose dels serveis que vagi muntant
-ansible/    playbooks (encara buit)
-proxmox/    configuració i notes de Proxmox
-scripts/    scripts petits de manteniment
+docs/        documentació general (hardware, xarxa, consum, problemes)
+pi-hole/     notes del Pi-hole
+homarr/      compose i notes del dashboard
+P110/        el monitor de consum (codi propi)
+lol-tracker/ el tracker de League (codi propi)
+docker/      compose dels serveis que vagi muntant
+ansible/     playbooks (encara buit)
+proxmox/     configuració i notes de Proxmox
+scripts/     scripts petits de manteniment
 ```
 
 Les carpetes buides ja estan pensades per anar-les omplint a mesura que automatitzi coses.

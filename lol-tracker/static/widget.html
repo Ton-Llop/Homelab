@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LoL · Tracker</title>
   <style>
-    /* Version de trabajo: comparte paleta con el widget del P110 para que los
-       dos se vean del mismo homelab. El pulido (fuentes pixeladas, iconos
-       grandes, grafica) viene en la siguiente pasada. */
+    /* Comparte paleta con el widget del P110 para que los dos se vean del
+       mismo homelab. Lo unico que falta de aquel son las fuentes pixeladas. */
     :root {
       color-scheme: dark;
       --surface: #0a0e14;
@@ -29,6 +28,14 @@
       color: var(--text);
       font-family: var(--mono);
       font-size: 13px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
     }
 
     .head { display: flex; justify-content: space-between; align-items: baseline; }
@@ -68,6 +75,34 @@
     .rank b { color: var(--tier, var(--text-2)); letter-spacing: .06em; }
     .rank span { color: var(--text-2); font-size: 11px; }
 
+    /* Grafica de LP. Riot no guarda historico, asi que esto es lo unico que
+       hay: lo que el sync ha ido anotando desde que existe el contenedor. */
+    .plot {
+      margin: 10px 0;
+      padding: 7px 9px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+    .plot__cap {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--text-2);
+    }
+    .plot svg { display: block; width: 100%; height: 44px; }
+    /* preserveAspectRatio="none" estira el viewBox, y con el la linea:
+       non-scaling-stroke la mantiene de grosor constante. */
+    #lp-line {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
+    }
+    #lp-area { fill: rgba(0, 168, 132, .14); stroke: none; }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
@@ -92,9 +127,45 @@
     .game img { width: 32px; height: 32px; display: block; margin: 0 auto 4px; }
     .game small { color: var(--text-2); font-size: 10px; }
 
+    /* Misma tabla que las metricas del widget del P110. */
+    .metrics {
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .metrics th,
+    .metrics td {
+      padding: 4px 7px;
+      text-align: right;
+      font-weight: 400;
+      white-space: nowrap;
+    }
+    .metrics thead th { color: var(--text-2); }
+    .metrics tbody th { width: 44%; text-align: left; color: var(--text-2); }
+    .metrics tbody td {
+      font-size: 12px;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .metrics tbody tr + tr th,
+    .metrics tbody tr + tr td { border-top: 1px solid var(--line); }
+
+    .champ { display: flex; align-items: center; gap: 5px; min-width: 0; }
+    .champ img { width: 14px; height: 14px; flex: none; }
+    .champ span { overflow: hidden; text-overflow: ellipsis; }
+
     .win { color: var(--accent); }
     .loss { color: var(--danger); }
-    .empty { color: var(--text-2); font-size: 11px; }
+    .empty { color: var(--text-2); font-size: 11px; margin: 4px 0 0; }
   </style>
 </head>
 <body>
@@ -115,6 +186,21 @@
     <span id="rank-record"></span>
   </div>
 
+  <figure class="plot">
+    <figcaption class="plot__cap">
+      <span>LP</span>
+      <span id="lp-delta"></span>
+    </figcaption>
+
+    <svg id="lp-svg" viewBox="0 0 300 44" preserveAspectRatio="none"
+         role="img" aria-label="Evolucion de LP" hidden>
+      <polygon id="lp-area" points=""></polygon>
+      <polyline id="lp-line" points=""></polyline>
+    </svg>
+
+    <p class="empty" id="lp-empty">sin historico todavia</p>
+  </figure>
+
   <div class="grid">
     <div class="cell"><u>KDA</u><b id="kda">--</b></div>
     <div class="cell"><u>Asist</u><b id="assists">--</b></div>
@@ -123,6 +209,19 @@
   </div>
 
   <div class="games" id="games"></div>
+
+  <table class="metrics">
+    <caption class="sr-only">Campeones mas jugados</caption>
+    <thead>
+      <tr>
+        <td></td>
+        <th scope="col">PJ</th>
+        <th scope="col">V-D</th>
+        <th scope="col">WR</th>
+      </tr>
+    </thead>
+    <tbody id="champs"></tbody>
+  </table>
 
   <script>
     // El servidor sincroniza con Riot cada 10-60 min segun la hora, asi que
@@ -153,6 +252,8 @@
 
       caja.dataset.tier = rank.tier;
 
+      // De Master para arriba no hay divisiones y el servidor manda
+      // division: null, asi que aqui no sale ningun "MASTER I".
       el("rank-tier").textContent =
         rank.tier + (rank.division ? " " + rank.division : "");
       el("rank-lp").textContent = rank.lp + " LP";
@@ -160,6 +261,53 @@
         rank.winrate === null
           ? ""
           : "· " + rank.wins + "V " + rank.losses + "D (" + rank.winrate + "%)";
+    }
+
+    function renderRankHistory(points) {
+      const svg = el("lp-svg");
+      const vacio = el("lp-empty");
+
+      if (!points || points.length < 2) {
+        svg.hidden = true;
+        vacio.hidden = false;
+        el("lp-delta").textContent = "";
+        el("lp-delta").className = "";
+        return;
+      }
+
+      svg.hidden = false;
+      vacio.hidden = true;
+
+      const valores = points.map((p) => p.lp);
+      const min = Math.min(...valores);
+      const max = Math.max(...valores);
+      const rango = max - min;
+
+      const pad = 3;
+      const alto = 44 - pad * 2;
+
+      const coords = valores.map((lp, i) => {
+        const x = (i / (valores.length - 1)) * 300;
+        // Si todas las muestras valen lo mismo no hay rango que escalar:
+        // dividir daria NaN, asi que la linea va por el medio.
+        const y =
+          rango === 0
+            ? pad + alto / 2
+            : pad + (1 - (lp - min) / rango) * alto;
+
+        return x.toFixed(1) + "," + y.toFixed(1);
+      });
+
+      el("lp-line").setAttribute("points", coords.join(" "));
+      el("lp-area").setAttribute(
+        "points",
+        coords.join(" ") + " 300,44 0,44"
+      );
+
+      const delta = valores[valores.length - 1] - valores[0];
+      el("lp-delta").textContent =
+        (delta > 0 ? "+" : "") + delta + " LP · " + valores.length + " muestras";
+      el("lp-delta").className = delta < 0 ? "loss" : delta > 0 ? "win" : "";
     }
 
     function renderGames(matches) {
@@ -185,11 +333,42 @@
         .join("");
     }
 
+    function renderChampions(champions) {
+      if (!champions || !champions.length) {
+        el("champs").innerHTML =
+          '<tr><th scope="row">--</th><td>--</td><td>--</td><td>--</td></tr>';
+        return;
+      }
+
+      el("champs").innerHTML = champions
+        .map((c) => {
+          const icon = c.icon
+            ? '<img src="' + c.icon + '" alt="" loading="lazy">'
+            : "";
+
+          return (
+            "<tr>" +
+            '<th scope="row"><span class="champ">' + icon +
+            "<span>" + c.champion + "</span></span></th>" +
+            "<td>" + c.games + "</td>" +
+            "<td>" + c.wins + "-" + c.losses + "</td>" +
+            '<td class="' + (c.winrate >= 50 ? "win" : "loss") + '">' +
+            c.winrate + "%</td>" +
+            "</tr>"
+          );
+        })
+        .join("");
+    }
+
     async function refresh() {
       try {
-        const [stats, recent] = await Promise.all([
+        // El historico y el top son extras: si fallan, el widget sigue
+        // enseñando lo importante en vez de quedarse en "sin conexion".
+        const [stats, recent, history, champs] = await Promise.all([
           fetch("/stats?count=20").then((r) => r.json()),
           fetch("/matches?limit=5").then((r) => r.json()),
+          fetch("/rank-history?limit=60").then((r) => r.json()).catch(() => null),
+          fetch("/champions?limit=3").then((r) => r.json()).catch(() => null),
         ]);
 
         el("winrate").textContent = stats.winrate === null ? "--" : stats.winrate;
@@ -200,6 +379,7 @@
           : "sin partidas";
 
         renderRank(stats.rank);
+        renderRankHistory(history && history.points);
 
         el("kda").textContent = stats.kda === null ? "--" : stats.kda;
         el("assists").textContent = stats.assists_avg === null ? "--" : stats.assists_avg;
@@ -210,6 +390,7 @@
         el("streak").className = streak.type === "W" ? "win" : "loss";
 
         renderGames(recent.matches);
+        renderChampions(champs && champs.champions);
 
         el("status").textContent = STATUS_LABELS[stats.status] || stats.status;
         el("status").dataset.bad = String(stats.status !== "ok");
@@ -219,8 +400,38 @@
       }
     }
 
+    let timer = null;
+
+    function start() {
+      if (timer === null) {
+        timer = setInterval(refresh, POLL_MS);
+      }
+    }
+
+    function stop() {
+      clearInterval(timer);
+      timer = null;
+    }
+
+    // Dentro de un iframe, document.hidden sigue a la pestaña de Homarr: si
+    // el dashboard no esta a la vista no hay a quien enseñarle nada, asi que
+    // paramos el reloj y al volver refrescamos una vez para no enseñar datos
+    // viejos mientras llega el siguiente tick.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        stop();
+        return;
+      }
+
+      refresh();
+      start();
+    });
+
     refresh();
-    setInterval(refresh, POLL_MS);
+
+    if (!document.hidden) {
+      start();
+    }
   </script>
 </body>
 </html>
